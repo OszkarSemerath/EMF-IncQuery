@@ -1,5 +1,6 @@
 package org.eclipse.viatra2.emf.incquery.queryexplorer.util;
 
+import org.eclipse.jface.viewers.CheckboxTableViewer;
 import org.eclipse.ui.IPerspectiveDescriptor;
 import org.eclipse.ui.IViewReference;
 import org.eclipse.ui.IWorkbenchPage;
@@ -14,18 +15,18 @@ public class QueryExplorerPerspectiveAdapter extends PerspectiveAdapter {
 		if (changeId.matches("viewShow")) {
 			for (IViewReference ref : page.getViewReferences()) {
 				if (ref.getId().matches(QueryExplorer.ID)) {
-//					CheckboxTreeViewer tableViewer = QueryExplorer.getInstance().getPatternsViewer();
-//					int size = tableViewer.getTree().getItems().length;
+					CheckboxTableViewer tableViewer = QueryExplorer.getInstance().getPatternsViewer();
+					int size = tableViewer.getTable().getItems().length;
 					
-//					for (int i = 0;i<size;i++) {
-//						String element = tableViewer.getElementAt(i).toString();
-//						if (PatternRegistry.getInstance().isActive(element)) {
-//							tableViewer.setChecked(element, true);
-//						}
-//						else {
-//							tableViewer.setChecked(element, false);
-//						}
-//					}
+					for (int i = 0;i<size;i++) {
+						String element = tableViewer.getElementAt(i).toString();
+						if (PatternRegistry.getInstance().isActive(element)) {
+							tableViewer.setChecked(element, true);
+						}
+						else {
+							tableViewer.setChecked(element, false);
+						}
+					}
 				}
 			}
 		}

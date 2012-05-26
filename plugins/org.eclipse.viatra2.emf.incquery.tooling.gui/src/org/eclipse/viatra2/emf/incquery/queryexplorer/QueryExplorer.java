@@ -1,5 +1,7 @@
 package org.eclipse.viatra2.emf.incquery.queryexplorer;
 
+import org.eclipse.core.databinding.beans.BeansObservables;
+import org.eclipse.core.databinding.observable.list.IObservableList;
 import org.eclipse.core.databinding.observable.value.IObservableValue;
 import org.eclipse.core.databinding.observable.value.IValueChangeListener;
 import org.eclipse.core.databinding.observable.value.ValueChangeEvent;
@@ -10,8 +12,11 @@ import org.eclipse.jface.action.GroupMarker;
 import org.eclipse.jface.action.IMenuListener;
 import org.eclipse.jface.action.IMenuManager;
 import org.eclipse.jface.action.MenuManager;
+import org.eclipse.jface.databinding.viewers.ObservableListContentProvider;
 import org.eclipse.jface.databinding.viewers.ViewersObservables;
-import org.eclipse.jface.viewers.CheckboxTreeViewer;
+import org.eclipse.jface.viewers.CheckboxTableViewer;
+import org.eclipse.jface.viewers.ColumnWeightData;
+import org.eclipse.jface.viewers.TableLayout;
 import org.eclipse.jface.viewers.TableViewer;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.swt.SWT;
@@ -33,12 +38,10 @@ import org.eclipse.viatra2.emf.incquery.queryexplorer.content.matcher.MatcherLab
 import org.eclipse.viatra2.emf.incquery.queryexplorer.content.matcher.MatcherTreeViewerRoot;
 import org.eclipse.viatra2.emf.incquery.queryexplorer.content.matcher.ObservablePatternMatch;
 import org.eclipse.viatra2.emf.incquery.queryexplorer.content.matcher.ObservablePatternMatcher;
-import org.eclipse.viatra2.emf.incquery.queryexplorer.content.patternsviewer.PatternComposite;
-import org.eclipse.viatra2.emf.incquery.queryexplorer.content.patternsviewer.PatternsViewerContentProvider;
-import org.eclipse.viatra2.emf.incquery.queryexplorer.content.patternsviewer.PatternsViewerLabelProvider;
 import org.eclipse.viatra2.emf.incquery.queryexplorer.util.CheckStateListener;
 import org.eclipse.viatra2.emf.incquery.queryexplorer.util.DoubleClickListener;
 import org.eclipse.viatra2.emf.incquery.queryexplorer.util.ModelEditorPartListener;
+import org.eclipse.viatra2.emf.incquery.queryexplorer.util.PatternRegistry;
 import org.eclipse.viatra2.emf.incquery.queryexplorer.util.QueryExplorerPerspectiveAdapter;
 import org.eclipse.viatra2.emf.incquery.queryexplorer.util.ResourceChangeListener;
 
@@ -55,7 +58,7 @@ public class QueryExplorer extends ViewPart {
 
 	public static final String ID = "org.eclipse.viatra2.emf.incquery.queryexplorer.QueryExplorer";
 	private TableViewer tableViewer;
-	private CheckboxTreeViewer patternsViewer;
+	private CheckboxTableViewer patternsViewer;
 	
 	//matcher tree viewer
 	private TreeViewer matcherTreeViewer;
@@ -65,7 +68,6 @@ public class QueryExplorer extends ViewPart {
 	
 	//observable view
 	private ModelEditorPartListener modelPartListener;
-	private PatternComposite patternsViewerInput;
 		
 	private QueryExplorerPerspectiveAdapter perspectiveAdapter;
 	
@@ -81,7 +83,6 @@ public class QueryExplorer extends ViewPart {
 		matcherTreeViewerRoot = new MatcherTreeViewerRoot();
 		modelPartListener = new ModelEditorPartListener();
 		perspectiveAdapter = new QueryExplorerPerspectiveAdapter();
-		patternsViewerInput = new PatternComposite("", null);
 	}
 	
 	public MatcherTreeViewerRoot getMatcherTreeViewerRoot() {
@@ -123,6 +124,14 @@ public class QueryExplorer extends ViewPart {
 		matcherTreeViewer = new TreeViewer(leftFlyoutControlComposite.getClientParent());
 		tableViewer = new TableViewer(rightFlyoutControlComposite.getFlyoutParent(), SWT.FULL_SELECTION);
 		
+		Table table = new Table(leftFlyoutControlComposite.getFlyoutParent(), SWT.CHECK | SWT.BORDER);
+        TableLayout layout = new TableLayout();
+        layout.addColumnData(new ColumnWeightData(100));
+        table.setLayout(layout);
+		
+		patternsViewer = new CheckboxTableViewer(table);
+		patternsViewer.addCheckStateListener(new CheckStateListener());
+		
 		//matcherTreeViewer configuration
 		matcherTreeViewer.setContentProvider(matcherContentProvider);
 		matcherTreeViewer.setLabelProvider(matcherLabelProvider);
@@ -132,12 +141,10 @@ public class QueryExplorer extends ViewPart {
 		selection.addValueChangeListener(new MatcherTreeViewerSelectionChangeListener());
 		matcherTreeViewer.addDoubleClickListener(new DoubleClickListener());
 		
-		//patternsViewer configuration		
-		patternsViewer = new CheckboxTreeViewer(leftFlyoutControlComposite.getFlyoutParent(), SWT.CHECK | SWT.BORDER);
-		patternsViewer.addCheckStateListener(new CheckStateListener());
-		patternsViewer.setContentProvider(new PatternsViewerContentProvider());
-		patternsViewer.setLabelProvider(new PatternsViewerLabelProvider());
-		patternsViewer.setInput(patternsViewerInput);
+		//patternsViewer configuration
+		patternsViewer.setContentProvider(new ObservableListContentProvider());
+		IObservableList list = BeansObservables.observeList(PatternRegistry.getInstance(), "patternNames", String.class);
+		patternsViewer.setInput(list);
 		
 		// Create menu manager.
         MenuManager matcherTreeViewerMenuManager = new MenuManager();
@@ -152,6 +159,7 @@ public class QueryExplorer extends ViewPart {
 		matcherTreeViewer.getControl().setMenu(matcherTreeViewerMenu);
 		getSite().registerContextMenu("org.eclipse.viatra2.emf.incquery.queryexplorer.QueryExplorer.treeViewerMenu", matcherTreeViewerMenuManager, matcherTreeViewer);
 		
+		
         MenuManager patternsViewerMenuManager = new MenuManager();
         patternsViewerMenuManager.setRemoveAllWhenShown(true);
         patternsViewerMenuManager.addMenuListener(new IMenuListener() {
@@ -165,7 +173,8 @@ public class QueryExplorer extends ViewPart {
 		getSite().registerContextMenu("org.eclipse.viatra2.emf.incquery.queryexplorer.QueryExplorer.patternsViewerMenu", patternsViewerMenuManager, patternsViewer);
 		
 		//tableView configuration
-		Table table = tableViewer.getTable();
+		//createColumns(tableViewer);
+		table = tableViewer.getTable();
 		table.setHeaderVisible(true);
 		table.setLinesVisible(true);
 
@@ -222,11 +231,7 @@ public class QueryExplorer extends ViewPart {
 		return modelPartListener;
 	}
 	
-	public PatternComposite getPatternsViewerInput() {
-		return patternsViewerInput;
-	}
-	
-	public CheckboxTreeViewer getPatternsViewer() {
+	public CheckboxTableViewer getPatternsViewer() {
 		return patternsViewer;
 	}
 }
