@@ -90,9 +90,11 @@ public class ShowLocationHandler extends AbstractHandler {
 	private TreeSelection prepareSelection(IEditorPart editorPart, Object[] locationObjects) {
 		List<TreePath> paths = new ArrayList<TreePath>(); //[locationObjects.length]
 		for (Object o: locationObjects) {
-			TreePath path = createTreePath(editorPart, (EObject) o);
-			if(path != null) {
-				paths.add(path);
+			if(o instanceof EObject) {
+				TreePath path = createTreePath(editorPart, (EObject) o);
+				if(path != null) {
+					paths.add(path);
+				}
 			}
 		}
 
