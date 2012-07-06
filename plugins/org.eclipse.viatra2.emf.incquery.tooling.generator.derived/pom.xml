@@ -32,6 +32,13 @@
 						</goals>
 					</execution>
 				</executions>
+				<dependencies>
+    				<dependency>
+						<groupId>org.eclipse.equinox</groupId>
+						<artifactId>org.eclipse.equinox.common</artifactId>
+						<version>3.6.0.v20110523</version>
+    				</dependency>
+    			</dependencies>
 			</plugin>
 		</plugins>
 	</build>
