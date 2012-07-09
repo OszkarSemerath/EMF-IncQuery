@@ -2,7 +2,7 @@ package org.eclipse.viatra2.emf.incquery.tooling.generator.genmodel;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.NoSuchElementException;
+import java.util.Iterator;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
@@ -26,6 +26,7 @@ import org.eclipse.xtext.parsetree.reconstr.ITokenSerializer.ICrossReferenceSeri
 import org.eclipse.xtext.resource.EObjectDescription;
 import org.eclipse.xtext.resource.IEObjectDescription;
 import org.eclipse.xtext.scoping.IScope;
+import org.eclipse.xtext.scoping.impl.FilteringScope;
 import org.eclipse.xtext.scoping.impl.SimpleScope;
 
 import com.google.common.base.Function;
@@ -38,12 +39,27 @@ import com.google.inject.Inject;
 public class GenModelMetamodelProviderService extends MetamodelProviderService
 		implements IEiqGenmodelProvider {
 
+	private final class ParentScopeFilter implements
+			Predicate<IEObjectDescription> {
+		Iterable<IEObjectDescription> referencedPackages;
+
+		public ParentScopeFilter(
+				Iterable<IEObjectDescription> referencedPackages) {
+			super();
+			this.referencedPackages = referencedPackages;
+		}
+
+		public boolean apply(IEObjectDescription desc) {
+			return !Iterables.contains(referencedPackages, desc.getQualifiedName());
+		}
+	}
+
 	@Inject
-	IJavaProjectProvider projectProvider;
+	private IJavaProjectProvider projectProvider;
 	@Inject
-	IQualifiedNameConverter qualifiedNameConverter;
+	private IQualifiedNameConverter qualifiedNameConverter;
 	@Inject
-	ICrossReferenceSerializer refSerializer;
+	private ICrossReferenceSerializer refSerializer;
 
 	private URI getGenmodelURI(IProject project) {
 		IFile file = project.getFile(IncQueryNature.IQGENMODEL);
@@ -53,31 +69,27 @@ public class GenModelMetamodelProviderService extends MetamodelProviderService
 	@Override
 	public IScope getAllMetamodelObjects(EObject ctx) {
 		Iterable<IEObjectDescription> referencedPackages = Lists.newArrayList();
-		try {
-			IncQueryGeneratorModel generatorModel = getGeneratorModel(ctx);
-			for (GeneratorModelReference ref : generatorModel.getGenmodels()) {
+		IncQueryGeneratorModel generatorModel = getGeneratorModel(ctx);
+		for (GeneratorModelReference ref : generatorModel.getGenmodels()) {
 
-				Iterable<IEObjectDescription> packages = Iterables.transform(
-						ref.getGenmodel().getGenPackages(),
-						new Function<GenPackage, IEObjectDescription>() {
-							public IEObjectDescription apply(GenPackage from) {
-								EPackage ePackage = from.getEcorePackage();
-								QualifiedName qualifiedName = qualifiedNameConverter
-										.toQualifiedName(ePackage.getNsURI());
-								return EObjectDescription.create(qualifiedName,
-										ePackage, Collections.singletonMap(
-												"nsURI", "true"));
-							}
-						});
-				referencedPackages = Iterables.concat(referencedPackages,
-						packages);
+			Iterable<IEObjectDescription> packages = Iterables.transform(ref
+					.getGenmodel().getGenPackages(),
+					new Function<GenPackage, IEObjectDescription>() {
+						public IEObjectDescription apply(GenPackage from) {
+							EPackage ePackage = from.getEcorePackage();
+							QualifiedName qualifiedName = qualifiedNameConverter
+									.toQualifiedName(ePackage.getNsURI());
+							return EObjectDescription.create(qualifiedName,
+									ePackage,
+									Collections.singletonMap("nsURI", "true"));
+						}
+					});
+			referencedPackages = Iterables.concat(referencedPackages, packages);
 			}
-		} catch (IllegalArgumentException e) {
-			//TODO logging needed
-			e.printStackTrace();
-		}
-		return new SimpleScope(super.getAllMetamodelObjects(ctx),
-				referencedPackages);
+		//The FilteringScope is used to ensure elements in eiq genmodel are not accidentally found in the parent version
+		return new SimpleScope(new FilteringScope(
+				super.getAllMetamodelObjects(ctx), new ParentScopeFilter(
+						referencedPackages)), referencedPackages);
 	}
 
 	@Override
@@ -176,21 +188,16 @@ public class GenModelMetamodelProviderService extends MetamodelProviderService
 		for (GeneratorModelReference genModel : eiqGenModel.getGenmodels()) {
 			genPackageIterable = Iterables.concat(genPackageIterable, genModel.getGenmodel().getGenPackages());
 		}
-		GenPackage genPackage = null;
-		try {
-			genPackage = Iterables.find(genPackageIterable,
+		Iterable<GenPackage> genPackages = Iterables.filter(genPackageIterable,
 					new Predicate<GenPackage>() {
 						public boolean apply(GenPackage genPackage) {
 							return packageNsUri.equals(genPackage
 									.getEcorePackage().getNsURI());
 						}
 					});
-		} catch (NoSuchElementException e) {
-			// Ignoring the exception here - no found genpackage is handled
-			// right after
-		}
-		if (genPackage != null) {
-			return genPackage;
+		Iterator<GenPackage> it = genPackages.iterator();
+		if (it.hasNext()) {
+			return it.next();
 		} else {
 			// TODO genmodels should not be loaded if ecore is already loaded #192
 			//return genmodelRegistry.findGenPackage(packageNsUri, set);
